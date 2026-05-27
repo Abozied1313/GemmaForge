@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import type { User } from "@/types";
+import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 interface AuthContextType {
   user: User | null;
@@ -17,11 +19,16 @@ const AuthContext = createContext<AuthContextType>({
   signOut: () => {},
 });
 
-const MOCK_USERS_KEY = "gf_users";
-const CURRENT_USER_KEY = "gf_current_user";
-
-interface StoredUser extends User {
-  password: string;
+function mapUser(u: SupabaseUser): User {
+  return {
+    id: u.id,
+    email: u.email!,
+    name:
+      u.user_metadata?.full_name ||
+      u.user_metadata?.name ||
+      u.email!.split("@")[0],
+    createdAt: u.created_at,
+  };
 }
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -29,64 +36,53 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const stored = localStorage.getItem(CURRENT_USER_KEY);
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(CURRENT_USER_KEY);
+    let mounted = true;
+
+    // Check existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted && session?.user) setUser(mapUser(session.user));
+      if (mounted) setIsLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!mounted) return;
+      if (event === "SIGNED_IN" && session?.user) {
+        setUser(mapUser(session.user));
+        setIsLoading(false);
+      } else if (event === "SIGNED_OUT") {
+        setUser(null);
+        setIsLoading(false);
+      } else if (event === "TOKEN_REFRESHED" && session?.user) {
+        setUser(mapUser(session.user));
       }
-    }
-    setIsLoading(false);
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const getUsers = (): StoredUser[] => {
-    try {
-      return JSON.parse(localStorage.getItem(MOCK_USERS_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  };
-
-  const saveUsers = (users: StoredUser[]) => {
-    localStorage.setItem(MOCK_USERS_KEY, JSON.stringify(users));
-  };
-
   const signIn = async (email: string, password: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 800));
-    const users = getUsers();
-    const found = users.find((u) => u.email === email && u.password === password);
-    if (found) {
-      const { password: _p, ...userData } = found;
-      setUser(userData);
-      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userData));
-      return true;
-    }
-    return false;
-  };
-
-  const signUp = async (email: string, password: string, name: string): Promise<boolean> => {
-    await new Promise((r) => setTimeout(r, 1000));
-    const users = getUsers();
-    if (users.find((u) => u.email === email)) return false;
-
-    const newUser: StoredUser = {
-      id: `user_${Date.now()}`,
-      email,
-      password,
-      name,
-      createdAt: new Date().toISOString(),
-    };
-    saveUsers([...users, newUser]);
-    const { password: _p, ...userData } = newUser;
-    setUser(userData);
-    localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userData));
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data.user) return false;
     return true;
   };
 
-  const signOut = () => {
+  const signUp = async (email: string, password: string, name: string): Promise<boolean> => {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name, name } },
+    });
+    if (error || !data.user) return false;
+    return true;
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem(CURRENT_USER_KEY);
   };
 
   return (

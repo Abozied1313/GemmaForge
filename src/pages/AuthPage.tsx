@@ -47,17 +47,27 @@ const AuthPage: React.FC = () => {
     setLoading(true);
     setError("");
 
-    let ok = false;
-    if (mode === "signin") {
-      ok = await signIn(email, password);
-      if (!ok) setError(t("invalidCredentials"));
-    } else {
-      ok = await signUp(email, password, name);
-      if (!ok) setError(isRTL ? "هذا البريد الإلكتروني مسجّل مسبقاً" : "This email is already registered");
-    }
+    try {
+      let ok = false;
+      if (mode === "signin") {
+        ok = await signIn(email, password);
+        if (!ok) setError(isRTL ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : "Invalid email or password");
+      } else {
+        if (password.length < 6) {
+          setError(isRTL ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters");
+          setLoading(false);
+          return;
+        }
+        ok = await signUp(email, password, name);
+        if (!ok) setError(isRTL ? "فشل إنشاء الحساب — قد يكون البريد مسجّلاً مسبقاً" : "Sign up failed — email may already be registered");
+      }
 
-    setLoading(false);
-    if (ok) navigate("/dashboard");
+      setLoading(false);
+      if (ok) navigate("/dashboard");
+    } catch {
+      setError(isRTL ? "حدث خطأ غير متوقع. حاول مرة أخرى" : "An unexpected error occurred. Please try again");
+      setLoading(false);
+    }
   };
 
   return (
