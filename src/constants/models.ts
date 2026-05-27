@@ -1,0 +1,73 @@
+import type { ModelInfo } from "@/types";
+
+export const GEMMA_MODELS: ModelInfo[] = [
+  {
+    id: "gemma-4-27b",
+    nameAr: "Gemma 4 — 27B",
+    nameEn: "Gemma 4 — 27B",
+    descAr: "أحدث وأقوى نماذج Gemma، مثالي للمهام المعقدة",
+    descEn: "Latest and most powerful Gemma model, ideal for complex tasks",
+    contextWindow: 128000,
+    params: "27B",
+    badge: "جديد",
+    badgeColor: "bg-gemma-500",
+  },
+  {
+    id: "gemma-4-12b",
+    nameAr: "Gemma 4 — 12B",
+    nameEn: "Gemma 4 — 12B",
+    descAr: "توازن ممتاز بين الأداء والسرعة",
+    descEn: "Excellent balance between performance and speed",
+    contextWindow: 128000,
+    params: "12B",
+    badge: "موصى به",
+    badgeColor: "bg-cyan-500",
+  },
+  {
+    id: "gemma-2-27b",
+    nameAr: "Gemma 2 — 27B",
+    nameEn: "Gemma 2 — 27B",
+    descAr: "النموذج الكبير من الجيل الثاني، دقة عالية",
+    descEn: "Large model from the 2nd generation, high accuracy",
+    contextWindow: 8192,
+    params: "27B",
+  },
+  {
+    id: "gemma-2-9b",
+    nameAr: "Gemma 2 — 9B",
+    nameEn: "Gemma 2 — 9B",
+    descAr: "سريع وفعال، مناسب لمعظم الاستخدامات",
+    descEn: "Fast and efficient, suitable for most use cases",
+    contextWindow: 8192,
+    params: "9B",
+  },
+  {
+    id: "gemma-2-2b",
+    nameAr: "Gemma 2 — 2B",
+    nameEn: "Gemma 2 — 2B",
+    descAr: "خفيف وسريع جداً للمهام البسيطة",
+    descEn: "Lightweight and very fast for simple tasks",
+    contextWindow: 8192,
+    params: "2B",
+  },
+  {
+    id: "gemma-7b",
+    nameAr: "Gemma 1 — 7B",
+    nameEn: "Gemma 1 — 7B",
+    descAr: "النموذج الأصلي 7 مليار معامل",
+    descEn: "Original model with 7 billion parameters",
+    contextWindow: 8192,
+    params: "7B",
+  },
+  {
+    id: "gemma-2b",
+    nameAr: "Gemma 1 — 2B",
+    nameEn: "Gemma 1 — 2B",
+    descAr: "النموذج الأصغر والأسرع في السلسلة",
+    descEn: "Smallest and fastest model in the series",
+    contextWindow: 8192,
+    params: "2B",
+  },
+];
+
+export const DEFAULT_MODEL = "gemma-4-12b";
