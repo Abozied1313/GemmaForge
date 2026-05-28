@@ -44,10 +44,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) setIsLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes (includes email confirmation callback)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === "SIGNED_IN" && session?.user) {
+      console.log("[Auth] event:", event, session?.user?.email);
+
+      if (
+        (event === "SIGNED_IN" ||
+         event === "INITIAL_SESSION" ||
+         event === "USER_UPDATED") &&
+        session?.user
+      ) {
         setUser(mapUser(session.user));
         setIsLoading(false);
       } else if (event === "SIGNED_OUT") {
@@ -55,6 +62,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
       } else if (event === "TOKEN_REFRESHED" && session?.user) {
         setUser(mapUser(session.user));
+      } else if (event === "INITIAL_SESSION" && !session) {
+        // No session on initial load
+        setIsLoading(false);
       }
     });
 
