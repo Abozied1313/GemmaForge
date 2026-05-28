@@ -7,14 +7,14 @@ import {
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import TopBar from "@/components/layout/TopBar";
 import PromptVariables from "@/components/features/PromptVariables";
-import { useProjects, usePrompts, useTestRuns, extractVariables, interpolatePrompt } from "@/hooks/useData";
+import { usePrompts, useTestRuns, extractVariables, interpolatePrompt } from "@/hooks/useData";
 import { useGemma, type RunResult } from "@/hooks/useGemma";
 import { GEMMA_MODELS, DEFAULT_MODEL } from "@/constants/models";
 import { useLang } from "@/contexts/LanguageContext";
 import type { GemmaModel, Prompt } from "@/types";
 import { cn } from "@/lib/utils";
 
-/* ─────────────────────────────── types ────────────────────────────────── */
+/* ──────────────────── types ──────────────────── */
 type PanelStatus = "idle" | "running" | "done" | "error";
 interface PanelState {
   model: GemmaModel;
@@ -23,8 +23,10 @@ interface PanelState {
   copied: boolean;
 }
 
-/* ─────────────────────────────── helpers ───────────────────────────────── */
-function StatsBar({ result, lang, isRTL, modelName }: { result: RunResult; lang: string; isRTL: boolean; modelName?: string }) {
+/* ──────────────────── StatsBar ──────────────────── */
+function StatsBar({ result, lang, isRTL, modelName }: {
+  result: RunResult; lang: string; isRTL: boolean; modelName?: string;
+}) {
   return (
     <div
       className={cn("flex items-center gap-4 px-4 py-2 border-b flex-shrink-0 flex-wrap text-xs", isRTL && "flex-row-reverse")}
@@ -58,22 +60,21 @@ function StatsBar({ result, lang, isRTL, modelName }: { result: RunResult; lang:
   );
 }
 
-function OutputPanel({
-  panel, onClear, onCopy, side, lang, isRTL,
-}: {
-  panel: PanelState;
-  onClear: () => void;
-  onCopy: () => void;
-  side: "A" | "B";
-  lang: string;
-  isRTL: boolean;
+/* ──────────────────── OutputPanel ──────────────────── */
+function OutputPanel({ panel, onClear, onCopy, side, lang, isRTL }: {
+  panel: PanelState; onClear: () => void; onCopy: () => void;
+  side: "A" | "B"; lang: string; isRTL: boolean;
 }) {
   const modelInfo = GEMMA_MODELS.find((m) => m.id === panel.model);
   const modelName = lang === "ar" ? modelInfo?.nameAr : modelInfo?.nameEn;
+  const accent = side === "A" ? "#6c3aff" : "#22d3ee";
+  const accentBg = side === "A" ? "rgba(108,58,255,0.25)" : "rgba(34,211,238,0.2)";
+  const accentBorder = side === "A" ? "rgba(108,58,255,0.4)" : "rgba(34,211,238,0.4)";
+  const accentText = side === "A" ? "#a99bff" : "#22d3ee";
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#080a0f", minWidth: 0 }}>
-      {/* Panel Header */}
+      {/* Header */}
       <div
         className={cn("flex items-center justify-between px-4 py-2.5 border-b flex-shrink-0", isRTL && "flex-row-reverse")}
         style={{ borderColor: "#1e2535", background: "#0a0c12" }}
@@ -81,26 +82,14 @@ function OutputPanel({
         <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
           <span
             className="w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold"
-            style={{
-              background: side === "A" ? "rgba(108,58,255,0.25)" : "rgba(34,211,238,0.2)",
-              color: side === "A" ? "#a99bff" : "#22d3ee",
-              border: side === "A" ? "1px solid rgba(108,58,255,0.4)" : "1px solid rgba(34,211,238,0.4)",
-            }}
-          >
-            {side}
-          </span>
+            style={{ background: accentBg, color: accentText, border: `1px solid ${accentBorder}` }}
+          >{side}</span>
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#8892a4" }}>
             {isRTL ? "النتيجة" : "Output"}
           </span>
-          {panel.status === "done" && !panel.result?.error && (
-            <CheckCheck className="w-3.5 h-3.5 text-green-400" />
-          )}
-          {panel.status === "running" && (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: side === "A" ? "#6c3aff" : "#22d3ee" }} />
-          )}
-          {panel.status === "error" && (
-            <AlertCircle className="w-3.5 h-3.5 text-red-400" />
-          )}
+          {panel.status === "done" && !panel.result?.error && <CheckCheck className="w-3.5 h-3.5 text-green-400" />}
+          {panel.status === "running" && <Loader2 className="w-3.5 h-3.5 animate-spin" style={{ color: accent }} />}
+          {panel.status === "error" && <AlertCircle className="w-3.5 h-3.5 text-red-400" />}
         </div>
         <div className={cn("flex items-center gap-1", isRTL && "flex-row-reverse")}>
           {panel.result?.output && (
@@ -127,14 +116,9 @@ function OutputPanel({
       <div className="flex-1 overflow-y-auto scrollbar-dark p-4">
         {panel.status === "idle" && (
           <div className="flex flex-col items-center justify-center h-full text-center py-8">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
-              style={{
-                background: side === "A" ? "rgba(108,58,255,0.1)" : "rgba(34,211,238,0.1)",
-                border: side === "A" ? "1px solid rgba(108,58,255,0.2)" : "1px solid rgba(34,211,238,0.2)",
-              }}
-            >
-              <Zap className="w-5 h-5" style={{ color: side === "A" ? "#6c3aff" : "#22d3ee" }} />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
+              style={{ background: `${accent}18`, border: `1px solid ${accentBorder}` }}>
+              <Zap className="w-5 h-5" style={{ color: accent }} />
             </div>
             <p className="text-xs" style={{ color: "#8892a4" }}>
               {isRTL ? "اختر نموذجاً وشغّل البرومبت" : "Select a model and run the prompt"}
@@ -144,14 +128,9 @@ function OutputPanel({
 
         {panel.status === "running" && (
           <div className="flex flex-col items-center justify-center h-full py-8">
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center mb-3 animate-pulse-glow"
-              style={{
-                background: side === "A" ? "rgba(108,58,255,0.15)" : "rgba(34,211,238,0.1)",
-                border: side === "A" ? "1px solid rgba(108,58,255,0.4)" : "1px solid rgba(34,211,238,0.4)",
-              }}
-            >
-              <Loader2 className="w-6 h-6 animate-spin" style={{ color: side === "A" ? "#6c3aff" : "#22d3ee" }} />
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center mb-3"
+              style={{ background: `${accent}18`, border: `1px solid ${accentBorder}` }}>
+              <Loader2 className="w-6 h-6 animate-spin" style={{ color: accent }} />
             </div>
             <p className="text-sm font-medium text-white mb-1">{modelName}</p>
             <p className="text-xs" style={{ color: "#8892a4" }}>
@@ -162,8 +141,8 @@ function OutputPanel({
                 className="h-full rounded-full shimmer-loading"
                 style={{
                   background: side === "A"
-                    ? "linear-gradient(90deg, #6c3aff, #a99bff, #6c3aff)"
-                    : "linear-gradient(90deg, #22d3ee, #67e8f9, #22d3ee)",
+                    ? "linear-gradient(90deg,#6c3aff,#a99bff,#6c3aff)"
+                    : "linear-gradient(90deg,#22d3ee,#67e8f9,#22d3ee)",
                   backgroundSize: "200% 100%",
                 }}
               />
@@ -172,7 +151,7 @@ function OutputPanel({
         )}
 
         {panel.status === "error" && panel.result?.error && (
-          <div className="rounded-xl p-4 animate-fade-in" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
+          <div className="rounded-xl p-4" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
             <div className={cn("flex items-center gap-2 mb-2", isRTL && "flex-row-reverse")}>
               <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
               <span className="text-sm font-medium text-red-400">
@@ -188,7 +167,7 @@ function OutputPanel({
         {panel.status === "done" && panel.result?.output && (
           <div className="animate-fade-in">
             <pre
-              className={cn("text-sm leading-relaxed whitespace-pre-wrap", isRTL && "text-right")}
+              className={cn("text-sm leading-relaxed whitespace-pre-wrap break-words", isRTL && "text-right")}
               style={{ color: "#e2e8f0", fontFamily: "JetBrains Mono, monospace" }}
             >
               {panel.result.output}
@@ -200,19 +179,19 @@ function OutputPanel({
   );
 }
 
-/* ─────────────────────────────── model mini-selector ───────────────────── */
+/* ──────────────────── MiniModelSelector ──────────────────── */
 function MiniModelSelector({ value, onChange, accentColor, isRTL }: {
-  value: GemmaModel;
-  onChange: (m: GemmaModel) => void;
-  accentColor: string;
-  isRTL: boolean;
+  value: GemmaModel; onChange: (m: GemmaModel) => void;
+  accentColor: string; isRTL: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const selected = GEMMA_MODELS.find((m) => m.id === value);
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
@@ -226,16 +205,16 @@ function MiniModelSelector({ value, onChange, accentColor, isRTL }: {
           background: open ? `${accentColor}18` : "#131720",
           border: `1px solid ${open ? accentColor + "60" : "#1e2535"}`,
           color: "#fff",
-          boxShadow: open ? `0 0 0 1px ${accentColor}30` : "none",
         }}
       >
         <span className="max-w-[140px] truncate">{selected?.nameEn ?? value}</span>
-        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform flex-shrink-0", open && "rotate-180")} style={{ color: "#8892a4" }} />
+        <ChevronDown className={cn("w-3.5 h-3.5 transition-transform flex-shrink-0", open && "rotate-180")}
+          style={{ color: "#8892a4" }} />
       </button>
 
       {open && (
         <div
-          className="absolute z-50 mt-1 w-64 rounded-xl overflow-hidden shadow-2xl animate-fade-in"
+          className="absolute z-50 mt-1 w-64 rounded-xl overflow-hidden shadow-2xl"
           style={{ background: "#0e1117", border: "1px solid #1e2535", [isRTL ? "right" : "left"]: 0 }}
         >
           <div className="p-1.5 space-y-0.5 max-h-72 overflow-y-auto scrollbar-dark">
@@ -243,10 +222,7 @@ function MiniModelSelector({ value, onChange, accentColor, isRTL }: {
               <button
                 key={m.id}
                 onClick={() => { onChange(m.id); setOpen(false); }}
-                className={cn(
-                  "w-full flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all",
-                  isRTL && "flex-row-reverse text-right"
-                )}
+                className={cn("w-full flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-left transition-all", isRTL && "flex-row-reverse text-right")}
                 style={{
                   background: value === m.id ? `${accentColor}18` : "transparent",
                   border: `1px solid ${value === m.id ? accentColor + "50" : "transparent"}`,
@@ -275,14 +251,14 @@ function MiniModelSelector({ value, onChange, accentColor, isRTL }: {
   );
 }
 
-/* ─────────────────────────────── main page ─────────────────────────────── */
+/* ──────────────────── Main Page ──────────────────── */
 const TestRunnerPage: React.FC = () => {
   const { t, isRTL, lang } = useLang();
   const [searchParams] = useSearchParams();
   const initPromptId = searchParams.get("promptId");
 
   const { prompts } = usePrompts();
-  const { saveRun } = useTestRuns();
+  const { runs, saveRun } = useTestRuns();
   const { runAB, isRunning } = useGemma();
 
   const [inputMode, setInputMode] = useState<"direct" | "library">("direct");
@@ -304,10 +280,9 @@ const TestRunnerPage: React.FC = () => {
     copied: false,
   });
 
-  const { runs } = useTestRuns();
-
   const selectedPrompt: Prompt | undefined = prompts.find((p) => p.id === selectedPromptId);
-  const activeContent = inputMode === "library" && selectedPrompt ? selectedPrompt.content : directInput;
+  const activeContent =
+    inputMode === "library" && selectedPrompt ? selectedPrompt.content : directInput;
   const variables = extractVariables(activeContent);
   const finalPrompt = interpolatePrompt(activeContent, variableValues);
 
@@ -323,25 +298,46 @@ const TestRunnerPage: React.FC = () => {
     setPanelA((p) => ({ ...p, status: "running", result: null }));
     setPanelB((p) => ({ ...p, status: "running", result: null }));
 
+    let resultA: RunResult | null = null;
+    let resultB: RunResult | null = null;
+
     await runAB(
       finalPrompt,
       panelA.model,
       panelB.model,
       (r) => {
+        resultA = r;
         setPanelA((p) => ({ ...p, status: r.error ? "error" : "done", result: r }));
-        if (!r.error) saveRun({ promptId: selectedPromptId || "direct", model: panelA.model, input: finalPrompt, variableValues, output: r.output, tokenCount: r.totalTokens, executionTime: r.executionTime, status: "success" });
       },
       (r) => {
+        resultB = r;
         setPanelB((p) => ({ ...p, status: r.error ? "error" : "done", result: r }));
-        if (!r.error) saveRun({ promptId: selectedPromptId || "direct", model: panelB.model, input: finalPrompt, variableValues, output: r.output, tokenCount: r.totalTokens, executionTime: r.executionTime, status: "success" });
       }
     );
+
+    // Save the A/B run to Supabase
+    if (resultA || resultB) {
+      const rA = resultA as RunResult | null;
+      const rB = resultB as RunResult | null;
+      await saveRun({
+        promptId: selectedPromptId || "direct",
+        promptText: finalPrompt,
+        modelA: panelA.model,
+        modelB: panelB.model,
+        outputA: rA?.output ?? "",
+        outputB: rB?.output ?? "",
+        tokensA: rA?.totalTokens ?? 0,
+        tokensB: rB?.totalTokens ?? 0,
+        timeA: rA?.executionTime ?? 0,
+        timeB: rB?.executionTime ?? 0,
+      });
+    }
   };
 
   const copyPanel = (which: "A" | "B") => {
-    const content = which === "A" ? panelA.result?.output : panelB.result?.output;
-    if (!content) return;
-    navigator.clipboard.writeText(content);
+    const text = which === "A" ? panelA.result?.output : panelB.result?.output;
+    if (!text) return;
+    navigator.clipboard.writeText(text);
     if (which === "A") {
       setPanelA((p) => ({ ...p, copied: true }));
       setTimeout(() => setPanelA((p) => ({ ...p, copied: false })), 2000);
@@ -363,18 +359,15 @@ const TestRunnerPage: React.FC = () => {
       <div className="flex-1 overflow-hidden flex flex-col">
         {/* Toolbar */}
         <div
-          className={cn("flex items-center gap-3 px-5 py-3 border-b flex-shrink-0", isRTL && "flex-row-reverse")}
+          className={cn("flex items-center gap-3 px-5 py-3 border-b flex-shrink-0 flex-wrap", isRTL && "flex-row-reverse")}
           style={{ background: "#0e1117", borderColor: "#1e2535" }}
         >
           {/* Mode toggle */}
           <div className="flex rounded-lg overflow-hidden text-xs" style={{ border: "1px solid #1e2535" }}>
             {(["direct", "library"] as const).map((m) => (
-              <button
-                key={m}
-                onClick={() => setInputMode(m)}
+              <button key={m} onClick={() => setInputMode(m)}
                 className="px-3 py-2 font-medium transition-colors"
-                style={{ background: inputMode === m ? "#6c3aff" : "#131720", color: inputMode === m ? "#fff" : "#8892a4" }}
-              >
+                style={{ background: inputMode === m ? "#6c3aff" : "#131720", color: inputMode === m ? "#fff" : "#8892a4" }}>
                 {m === "direct" ? t("directInput") : t("fromPromptLibrary")}
               </button>
             ))}
@@ -386,17 +379,19 @@ const TestRunnerPage: React.FC = () => {
               <select
                 value={selectedPromptId}
                 onChange={(e) => setSelectedPromptId(e.target.value)}
-                className={cn("w-full py-2 px-3 text-sm text-white rounded-lg appearance-none cursor-pointer outline-none", isRTL && "text-right")}
+                className="w-full py-2 px-3 text-sm text-white rounded-lg appearance-none cursor-pointer outline-none"
                 style={{ background: "#131720", border: "1px solid #1e2535" }}
               >
                 <option value="">{t("selectPrompt")}</option>
-                {prompts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {prompts.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
-              <ChevronDown className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none", isRTL ? "left-2" : "right-2")} style={{ color: "#8892a4" }} />
+              <ChevronDown
+                className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none", isRTL ? "left-2" : "right-2")}
+                style={{ color: "#8892a4" }} />
             </div>
           )}
 
-          {/* A/B label */}
+          {/* A/B badge */}
           <div className={cn("flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg", isRTL && "flex-row-reverse")}
             style={{ background: "#131720", border: "1px solid #1e2535", color: "#8892a4" }}>
             <GitCompare className="w-3.5 h-3.5" style={{ color: "#6c3aff" }} />
@@ -407,8 +402,8 @@ const TestRunnerPage: React.FC = () => {
             <button
               onClick={() => setShowHistory(!showHistory)}
               className="p-2 rounded-lg transition-colors"
-              style={{ background: showHistory ? "rgba(108,58,255,0.1)" : "#131720", color: showHistory ? "#a99bff" : "#8892a4", border: "1px solid #1e2535" }}
               title={isRTL ? "السجل" : "History"}
+              style={{ background: showHistory ? "rgba(108,58,255,0.1)" : "#131720", color: showHistory ? "#a99bff" : "#8892a4", border: "1px solid #1e2535" }}
             >
               <History className="w-4 h-4" />
             </button>
@@ -417,6 +412,7 @@ const TestRunnerPage: React.FC = () => {
 
         {/* Body */}
         <div className={cn("flex flex-1 overflow-hidden", isRTL && "flex-row-reverse")}>
+
           {/* LEFT: Prompt Input */}
           <div
             className="w-80 flex-shrink-0 flex flex-col overflow-hidden border-r"
@@ -435,7 +431,7 @@ const TestRunnerPage: React.FC = () => {
               </span>
             </div>
 
-            {/* Textarea / preview */}
+            {/* Textarea */}
             <div className="flex-1 overflow-y-auto scrollbar-dark p-3 space-y-3">
               {inputMode === "direct" ? (
                 <textarea
@@ -443,7 +439,7 @@ const TestRunnerPage: React.FC = () => {
                   onChange={(e) => setDirectInput(e.target.value)}
                   placeholder={t("promptContentPlaceholder")}
                   className={cn(
-                    "code-editor w-full rounded-xl p-3.5 resize-none outline-none leading-relaxed min-h-[220px] text-sm transition-all",
+                    "code-editor w-full rounded-xl p-3.5 resize-none outline-none leading-relaxed min-h-[220px] text-sm",
                     "focus:ring-1 focus:ring-purple-500/50",
                     isRTL && "text-right"
                   )}
@@ -452,9 +448,9 @@ const TestRunnerPage: React.FC = () => {
               ) : (
                 <div
                   className="code-editor rounded-xl p-3.5 min-h-[220px] text-sm leading-relaxed whitespace-pre-wrap"
-                  style={{ color: "#e2e8f0" }}
+                  style={{ color: selectedPrompt ? "#e2e8f0" : "#4a5568" }}
                 >
-                  {selectedPrompt?.content || <span style={{ color: "#4a5568" }}>{t("selectPrompt")}...</span>}
+                  {selectedPrompt?.content || (isRTL ? "اختر برومبتاً..." : "Select a prompt...")}
                 </div>
               )}
 
@@ -462,7 +458,7 @@ const TestRunnerPage: React.FC = () => {
                 <PromptVariables variables={variables} values={variableValues} onChange={setVariableValues} />
               )}
 
-              {variables.length > 0 && Object.keys(variableValues).some((k) => variableValues[k]) && (
+              {variables.length > 0 && Object.values(variableValues).some(Boolean) && (
                 <div className="rounded-xl p-3.5" style={{ background: "#0e1117", border: "1px solid rgba(108,58,255,0.2)" }}>
                   <p className="text-xs font-medium mb-2" style={{ color: "#a99bff" }}>
                     {isRTL ? "معاينة نهائية" : "Final Preview"}
@@ -474,29 +470,38 @@ const TestRunnerPage: React.FC = () => {
               )}
             </div>
 
-            {/* Model selectors row */}
-            <div
-              className="px-3 py-3 border-t space-y-2 flex-shrink-0"
-              style={{ borderColor: "#1e2535", background: "#0a0c12" }}
-            >
+            {/* Model Selectors */}
+            <div className="px-3 py-3 border-t space-y-2 flex-shrink-0"
+              style={{ borderColor: "#1e2535", background: "#0a0c12" }}>
               <div className={cn("flex items-center justify-between", isRTL && "flex-row-reverse")}>
-                <span
-                  className="w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ background: "rgba(108,58,255,0.25)", color: "#a99bff", border: "1px solid rgba(108,58,255,0.4)" }}
-                >A</span>
-                <MiniModelSelector value={panelA.model} onChange={(m) => setPanelA((p) => ({ ...p, model: m }))} accentColor="#6c3aff" isRTL={isRTL} />
+                <span className="w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  style={{ background: "rgba(108,58,255,0.25)", color: "#a99bff", border: "1px solid rgba(108,58,255,0.4)" }}>
+                  A
+                </span>
+                <MiniModelSelector
+                  value={panelA.model}
+                  onChange={(m) => setPanelA((p) => ({ ...p, model: m }))}
+                  accentColor="#6c3aff"
+                  isRTL={isRTL}
+                />
               </div>
               <div className={cn("flex items-center justify-between", isRTL && "flex-row-reverse")}>
-                <span
-                  className="w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0"
-                  style={{ background: "rgba(34,211,238,0.2)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.4)" }}
-                >B</span>
-                <MiniModelSelector value={panelB.model} onChange={(m) => setPanelB((p) => ({ ...p, model: m }))} accentColor="#22d3ee" isRTL={isRTL} />
+                <span className="w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold flex-shrink-0"
+                  style={{ background: "rgba(34,211,238,0.2)", color: "#22d3ee", border: "1px solid rgba(34,211,238,0.4)" }}>
+                  B
+                </span>
+                <MiniModelSelector
+                  value={panelB.model}
+                  onChange={(m) => setPanelB((p) => ({ ...p, model: m }))}
+                  accentColor="#22d3ee"
+                  isRTL={isRTL}
+                />
               </div>
             </div>
 
             {/* Run Button */}
-            <div className="px-3 py-3 border-t flex-shrink-0" style={{ borderColor: "#1e2535", background: "#0a0c12" }}>
+            <div className="px-3 py-3 border-t flex-shrink-0"
+              style={{ borderColor: "#1e2535", background: "#0a0c12" }}>
               <button
                 onClick={handleRun}
                 disabled={isRunning || !finalPrompt.trim()}
@@ -505,47 +510,25 @@ const TestRunnerPage: React.FC = () => {
                   isRTL && "flex-row-reverse"
                 )}
               >
-                {isRunning ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" />{t("running")}</>
-                ) : (
-                  <><Play className="w-4 h-4" />{t("runPrompt")}</>
-                )}
+                {isRunning
+                  ? <><Loader2 className="w-4 h-4 animate-spin" />{t("running")}</>
+                  : <><Play className="w-4 h-4" />{t("runPrompt")}</>
+                }
               </button>
             </div>
           </div>
 
           {/* RIGHT: A/B Output panels */}
           <div className="flex-1 flex overflow-hidden">
-            {/* Panel A */}
-            <OutputPanel
-              panel={panelA}
-              onCopy={() => copyPanel("A")}
-              onClear={() => clearPanel("A")}
-              side="A"
-              lang={lang}
-              isRTL={isRTL}
-            />
-
-            {/* Divider */}
+            <OutputPanel panel={panelA} onCopy={() => copyPanel("A")} onClear={() => clearPanel("A")} side="A" lang={lang} isRTL={isRTL} />
             <div className="w-px flex-shrink-0" style={{ background: "#1e2535" }} />
-
-            {/* Panel B */}
-            <OutputPanel
-              panel={panelB}
-              onCopy={() => copyPanel("B")}
-              onClear={() => clearPanel("B")}
-              side="B"
-              lang={lang}
-              isRTL={isRTL}
-            />
+            <OutputPanel panel={panelB} onCopy={() => copyPanel("B")} onClear={() => clearPanel("B")} side="B" lang={lang} isRTL={isRTL} />
           </div>
 
           {/* History Sidebar */}
           {showHistory && (
-            <div
-              className="w-64 flex-shrink-0 overflow-y-auto scrollbar-dark border-l"
-              style={{ background: "#0e1117", borderColor: "#1e2535" }}
-            >
+            <div className="w-64 flex-shrink-0 overflow-y-auto scrollbar-dark border-l"
+              style={{ background: "#0e1117", borderColor: "#1e2535" }}>
               <div className={cn("flex items-center justify-between px-4 py-3 border-b", isRTL && "flex-row-reverse")}
                 style={{ borderColor: "#1e2535" }}>
                 <span className="text-sm font-semibold text-white">{t("runHistory")}</span>
@@ -556,22 +539,26 @@ const TestRunnerPage: React.FC = () => {
                   <p className="text-xs text-center py-6" style={{ color: "#8892a4" }}>{t("noRunHistory")}</p>
                 ) : (
                   runs.slice(0, 20).map((run) => {
-                    const model = GEMMA_MODELS.find((m) => m.id === run.model);
+                    const modelA = GEMMA_MODELS.find((m) => m.id === run.modelA);
                     return (
-                      <div
-                        key={run.id}
-                        className="rounded-lg p-3 transition-all cursor-pointer hover:border-purple-500/30"
-                        style={{ background: "#131720", border: "1px solid #1e2535" }}
-                      >
+                      <div key={run.id}
+                        className="rounded-lg p-3"
+                        style={{ background: "#131720", border: "1px solid #1e2535" }}>
                         <div className={cn("flex items-center justify-between mb-1", isRTL && "flex-row-reverse")}>
                           <span className="text-xs font-medium text-white truncate">
-                            {lang === "ar" ? model?.nameAr : model?.nameEn}
+                            {lang === "ar" ? modelA?.nameAr : modelA?.nameEn}
                           </span>
-                          <div className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                            style={{ background: run.status === "success" ? "#10b981" : "#ef4444" }} />
+                          {run.modelB && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(34,211,238,0.1)", color: "#22d3ee" }}>
+                              A/B
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs" style={{ color: "#8892a4" }}>
-                          {run.totalTokens} tokens · {run.executionTime}ms
+                          {run.tokensA} tokens · {run.timeA}ms
+                        </p>
+                        <p className="text-[10px] mt-0.5 truncate" style={{ color: "#4a5568" }}>
+                          {run.promptText.slice(0, 40)}...
                         </p>
                       </div>
                     );

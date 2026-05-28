@@ -12,6 +12,7 @@ export interface Project {
   name: string;
   description: string;
   color: string;
+  icon?: string;
   promptCount: number;
   createdAt: string;
   updatedAt: string;
@@ -21,7 +22,8 @@ export interface Prompt {
   id: string;
   projectId: string;
   userId: string;
-  name: string;
+  /** displayed title / name */
+  title: string;
   content: string;
   variables: string[];
   tags: string[];
@@ -30,16 +32,19 @@ export interface Prompt {
   updatedAt: string;
 }
 
+/** Matches the test_runs table in Supabase */
 export interface TestRun {
   id: string;
   promptId: string;
-  model: GemmaModel;
-  input: string;
-  variableValues: Record<string, string>;
-  output: string;
-  tokenCount: number;
-  executionTime: number;
-  status: "success" | "error" | "running";
+  promptText: string;
+  modelA: GemmaModel;
+  modelB?: GemmaModel;
+  outputA: string;
+  outputB?: string;
+  tokensA: number;
+  tokensB?: number;
+  timeA: number;
+  timeB?: number;
   createdAt: string;
 }
 

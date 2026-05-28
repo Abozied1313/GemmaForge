@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  Plus, Save, Trash2, FileCode2, ChevronDown, Variable, Eye, Zap, Tag, X
+  Plus, Save, Trash2, FileCode2, ChevronDown, Variable, Eye, Zap, Tag
 } from "lucide-react";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import TopBar from "@/components/layout/TopBar";
@@ -21,11 +21,12 @@ const PromptEditorPage: React.FC = () => {
   const { prompts, createPrompt, updatePrompt, deletePrompt } = usePrompts(selectedProjectId || undefined);
   const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
 
-  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [description, setDescription] = useState("");
   const [tagsInput, setTagsInput] = useState("");
   const [isDirty, setIsDirty] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
 
@@ -37,65 +38,88 @@ const PromptEditorPage: React.FC = () => {
     if (initProjectId) setSelectedProjectId(initProjectId);
   }, [initProjectId]);
 
+  // When prompts reload and we have a selected prompt, sync its content
+  useEffect(() => {
+    if (selectedPrompt) {
+      const fresh = prompts.find((p) => p.id === selectedPrompt.id);
+      if (fresh) {
+        setSelectedPrompt(fresh);
+      }
+    }
+  }, [prompts]);
+
   const loadPrompt = (p: Prompt) => {
     setSelectedPrompt(p);
-    setName(p.name);
+    setTitle(p.title);
     setContent(p.content);
     setDescription(p.description);
     setTagsInput(p.tags.join(", "));
     setIsDirty(false);
+    setShowPreview(false);
   };
 
   const handleNew = () => {
     setSelectedPrompt(null);
-    setName("");
+    setTitle("");
     setContent("");
     setDescription("");
     setTagsInput("");
     setIsDirty(false);
+    setShowPreview(false);
   };
 
-  const handleSave = () => {
-    if (!name.trim() || !selectedProjectId) return;
-    const tags = tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
+  const handleSave = async () => {
+    if (!title.trim() || !selectedProjectId) return;
+    setSaving(true);
+    const tags = tagsInput.split(",").map((s) => s.trim()).filter(Boolean);
     const vars = extractVariables(content);
 
     if (selectedPrompt) {
-      updatePrompt(selectedPrompt.id, { name, content, description, tags, variables: vars });
+      await updatePrompt(selectedPrompt.id, { title, content, description, tags, variables: vars });
     } else {
-      const p = createPrompt({ name, content, description, tags, variables: vars, projectId: selectedProjectId });
-      setSelectedPrompt(p);
+      const created = await createPrompt({
+        title,
+        content,
+        description,
+        tags,
+        variables: vars,
+        projectId: selectedProjectId,
+      });
+      if (created) setSelectedPrompt(created);
     }
+    setSaving(false);
     setIsDirty(false);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => setSaved(false), 2500);
   };
 
-  const handleDelete = (id: string) => {
-    deletePrompt(id);
+  const handleDelete = async (id: string) => {
+    await deletePrompt(id);
     if (selectedPrompt?.id === id) handleNew();
   };
 
   const markDirty = useCallback(() => setIsDirty(true), []);
 
-  const highlightVariables = (text: string) => {
-    return text.replace(/\{\{([^}]+)\}\}/g, '<span class="variable-chip">{{$1}}</span>');
-  };
+  const highlightVariables = (text: string) =>
+    text.replace(/\{\{([^}]+)\}\}/g, '<span class="variable-chip">{{$1}}</span>');
 
   return (
     <DashboardLayout>
       <TopBar title={t("promptEditor")} />
       <div className={cn("flex flex-1 overflow-hidden", isRTL && "flex-row-reverse")}>
-        {/* Sidebar - Prompt List */}
-        <div className="w-64 flex flex-col flex-shrink-0 border-r overflow-hidden"
-          style={{ background: "#0e1117", borderColor: "#1e2535" }}>
+
+        {/* ── Sidebar: Prompt List ── */}
+        <div
+          className="w-64 flex flex-col flex-shrink-0 border-r overflow-hidden"
+          style={{ background: "#0e1117", borderColor: "#1e2535" }}
+        >
           {/* Project Selector */}
           <div className="p-3 border-b" style={{ borderColor: "#1e2535" }}>
             <div className="relative">
               <select
                 value={selectedProjectId}
                 onChange={(e) => { setSelectedProjectId(e.target.value); handleNew(); }}
-                className={cn("w-full py-2 px-3 text-sm text-white rounded-lg appearance-none cursor-pointer outline-none", isRTL && "text-right")}
+                className="w-full py-2 px-3 text-sm text-white rounded-lg appearance-none cursor-pointer outline-none"
                 style={{ background: "#131720", border: "1px solid #1e2535" }}
               >
                 <option value="">{t("selectProject")}</option>
@@ -103,16 +127,18 @@ const PromptEditorPage: React.FC = () => {
                   <option key={p.id} value={p.id}>{p.name}</option>
                 ))}
               </select>
-              <ChevronDown className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none", isRTL ? "left-2" : "right-2")}
-                style={{ color: "#8892a4" }} />
+              <ChevronDown
+                className={cn("absolute top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none", isRTL ? "left-2" : "right-2")}
+                style={{ color: "#8892a4" }}
+              />
             </div>
           </div>
 
-          {/* New Prompt Button */}
+          {/* New Prompt */}
           <div className="p-2 border-b" style={{ borderColor: "#1e2535" }}>
             <button
               onClick={handleNew}
-              className={cn("w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors", isRTL && "flex-row-reverse")}
+              className={cn("w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all", isRTL && "flex-row-reverse")}
               style={{ background: "rgba(108,58,255,0.15)", border: "1px solid rgba(108,58,255,0.3)", color: "#a99bff" }}
             >
               <Plus className="w-4 h-4" />
@@ -133,10 +159,7 @@ const PromptEditorPage: React.FC = () => {
               prompts.map((p) => (
                 <div
                   key={p.id}
-                  className={cn(
-                    "group flex items-start justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all",
-                    selectedPrompt?.id === p.id ? "active" : ""
-                  )}
+                  className="group flex items-start justify-between px-3 py-2.5 rounded-lg cursor-pointer transition-all"
                   style={{
                     background: selectedPrompt?.id === p.id ? "rgba(108,58,255,0.2)" : "transparent",
                     border: selectedPrompt?.id === p.id ? "1px solid rgba(108,58,255,0.3)" : "1px solid transparent",
@@ -144,15 +167,13 @@ const PromptEditorPage: React.FC = () => {
                   onClick={() => loadPrompt(p)}
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-white truncate">{p.name}</p>
-                    <p className="text-xs truncate mt-0.5" style={{ color: "#8892a4" }}>
-                      {p.variables.length > 0 && (
-                        <span className="inline-flex items-center gap-1">
-                          <Variable className="w-3 h-3" />
-                          {p.variables.length}
-                        </span>
-                      )}
-                    </p>
+                    <p className="text-sm font-medium text-white truncate">{p.title}</p>
+                    {p.variables.length > 0 && (
+                      <p className="text-xs mt-0.5 flex items-center gap-1" style={{ color: "#8892a4" }}>
+                        <Variable className="w-3 h-3" />
+                        {p.variables.length}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
@@ -167,14 +188,15 @@ const PromptEditorPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Editor */}
+        {/* ── Main Editor ── */}
         <div className="flex-1 flex flex-col overflow-hidden" style={{ background: "#080a0f" }}>
           {!selectedProjectId ? (
+            /* No project selected */
             <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
               <FileCode2 className="w-16 h-16 mb-4" style={{ color: "#1e2535" }} />
               <h3 className="text-xl font-bold text-white mb-2">{t("selectProject")}</h3>
               <p className="text-sm mb-4" style={{ color: "#8892a4" }}>
-                {isRTL ? "اختر مشروعاً من القائمة على اليسار لتبدأ في كتابة البرومبتات" : "Select a project from the list to start writing prompts"}
+                {isRTL ? "اختر مشروعاً من القائمة لتبدأ في كتابة البرومبتات" : "Select a project to start writing prompts"}
               </p>
               <button onClick={() => navigate("/projects")} className="gemma-button text-sm">
                 {t("myProjects")}
@@ -182,21 +204,27 @@ const PromptEditorPage: React.FC = () => {
             </div>
           ) : (
             <>
-              {/* Editor Toolbar */}
-              <div className={cn("flex items-center justify-between px-5 py-3 border-b flex-shrink-0", isRTL && "flex-row-reverse")}
-                style={{ borderColor: "#1e2535", background: "#0e1117" }}>
+              {/* Toolbar */}
+              <div
+                className={cn("flex items-center justify-between px-5 py-3 border-b flex-shrink-0", isRTL && "flex-row-reverse")}
+                style={{ borderColor: "#1e2535", background: "#0e1117" }}
+              >
                 <div className={cn("flex items-center gap-3", isRTL && "flex-row-reverse")}>
                   <span className="text-sm font-medium text-white">
-                    {selectedPrompt ? selectedPrompt.name : isRTL ? "برومبت جديد" : "New Prompt"}
+                    {selectedPrompt ? selectedPrompt.title : (isRTL ? "برومبت جديد" : "New Prompt")}
                   </span>
-                  {isDirty && <span className="w-2 h-2 rounded-full bg-yellow-400" title="Unsaved changes" />}
+                  {isDirty && <span className="w-2 h-2 rounded-full bg-yellow-400" title="Unsaved" />}
                   {saved && <span className="text-xs text-green-400">✓ {t("changesSaved")}</span>}
                 </div>
                 <div className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
                   <button
                     onClick={() => setShowPreview(!showPreview)}
                     className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all", isRTL && "flex-row-reverse")}
-                    style={{ background: showPreview ? "rgba(34,211,238,0.1)" : "#131720", color: showPreview ? "#22d3ee" : "#8892a4", border: "1px solid #1e2535" }}
+                    style={{
+                      background: showPreview ? "rgba(34,211,238,0.1)" : "#131720",
+                      color: showPreview ? "#22d3ee" : "#8892a4",
+                      border: "1px solid #1e2535",
+                    }}
                   >
                     <Eye className="w-3.5 h-3.5" />
                     {t("preview")}
@@ -212,18 +240,18 @@ const PromptEditorPage: React.FC = () => {
                   </button>
                   <button
                     onClick={handleSave}
-                    disabled={!name.trim() || !selectedProjectId}
+                    disabled={saving || !title.trim() || !selectedProjectId}
                     className={cn("gemma-button flex items-center gap-1.5 text-xs px-4 py-1.5 disabled:opacity-40", isRTL && "flex-row-reverse")}
                   >
                     <Save className="w-3.5 h-3.5" />
-                    {t("savePrompt")}
+                    {saving ? (isRTL ? "جارٍ الحفظ..." : "Saving...") : t("savePrompt")}
                   </button>
                 </div>
               </div>
 
               {/* Editor Body */}
-              <div className="flex-1 overflow-y-auto scrollbar-dark p-5 space-y-5">
-                {/* Name + Description */}
+              <div className="flex-1 overflow-y-auto scrollbar-dark p-5 space-y-4">
+                {/* Title + Description */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div>
                     <label className={cn("block text-xs font-medium mb-1.5", isRTL && "text-right")} style={{ color: "#8892a4" }}>
@@ -231,10 +259,10 @@ const PromptEditorPage: React.FC = () => {
                     </label>
                     <input
                       type="text"
-                      value={name}
-                      onChange={(e) => { setName(e.target.value); markDirty(); }}
+                      value={title}
+                      onChange={(e) => { setTitle(e.target.value); markDirty(); }}
                       placeholder={t("promptNamePlaceholder")}
-                      className={cn("w-full px-4 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none", isRTL && "text-right")}
+                      className={cn("w-full px-4 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-purple-500/50", isRTL && "text-right")}
                       style={{ background: "#0e1117", border: "1px solid #1e2535" }}
                     />
                   </div>
@@ -247,7 +275,7 @@ const PromptEditorPage: React.FC = () => {
                       value={description}
                       onChange={(e) => { setDescription(e.target.value); markDirty(); }}
                       placeholder={t("promptDescPlaceholder")}
-                      className={cn("w-full px-4 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none", isRTL && "text-right")}
+                      className={cn("w-full px-4 py-2.5 rounded-lg text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-purple-500/50", isRTL && "text-right")}
                       style={{ background: "#0e1117", border: "1px solid #1e2535" }}
                     />
                   </div>
@@ -255,7 +283,7 @@ const PromptEditorPage: React.FC = () => {
 
                 {/* Tags */}
                 <div>
-                  <label className={cn("block text-xs font-medium mb-1.5 flex items-center gap-1.5", isRTL && "flex-row-reverse justify-end")} style={{ color: "#8892a4" }}>
+                  <label className={cn("flex items-center gap-1.5 text-xs font-medium mb-1.5", isRTL && "flex-row-reverse justify-end")} style={{ color: "#8892a4" }}>
                     <Tag className="w-3 h-3" />
                     {t("promptTags")}
                   </label>
@@ -264,13 +292,13 @@ const PromptEditorPage: React.FC = () => {
                     value={tagsInput}
                     onChange={(e) => { setTagsInput(e.target.value); markDirty(); }}
                     placeholder={t("tagsPlaceholder")}
-                    className={cn("w-full px-4 py-2 rounded-lg text-sm text-white placeholder-gray-600 outline-none", isRTL && "text-right")}
+                    className={cn("w-full px-4 py-2 rounded-lg text-sm text-white placeholder-gray-600 outline-none focus:ring-1 focus:ring-purple-500/50", isRTL && "text-right")}
                     style={{ background: "#0e1117", border: "1px solid #1e2535" }}
                   />
                 </div>
 
                 {/* Content */}
-                <div className="flex-1">
+                <div>
                   <div className={cn("flex items-center justify-between mb-1.5", isRTL && "flex-row-reverse")}>
                     <label className="text-xs font-medium" style={{ color: "#8892a4" }}>
                       {t("promptContent")} *
@@ -288,7 +316,9 @@ const PromptEditorPage: React.FC = () => {
                     <div
                       className="w-full rounded-xl p-4 min-h-64 text-sm leading-relaxed"
                       style={{ background: "#0a0c12", border: "1px solid #1e2535", color: "#e2e8f0" }}
-                      dangerouslySetInnerHTML={{ __html: highlightVariables(content || (isRTL ? "اكتب البرومبت أولاً..." : "Write your prompt first...")) }}
+                      dangerouslySetInnerHTML={{
+                        __html: highlightVariables(content || (isRTL ? "اكتب البرومبت أولاً..." : "Write your prompt first...")),
+                      }}
                     />
                   ) : (
                     <textarea
@@ -296,14 +326,14 @@ const PromptEditorPage: React.FC = () => {
                       onChange={(e) => { setContent(e.target.value); markDirty(); }}
                       placeholder={t("promptContentPlaceholder")}
                       rows={16}
-                      className={cn("code-editor w-full rounded-xl p-4 resize-none outline-none leading-relaxed scrollbar-dark", isRTL && "text-right")}
+                      className={cn("code-editor w-full rounded-xl p-4 resize-none outline-none leading-relaxed scrollbar-dark focus:ring-1 focus:ring-purple-500/30", isRTL && "text-right")}
                       style={{ minHeight: "320px" }}
                       spellCheck={false}
                     />
                   )}
                 </div>
 
-                {/* Variables Panel */}
+                {/* Variables */}
                 {variables.length > 0 && (
                   <div className="rounded-xl p-4" style={{ background: "#0e1117", border: "1px solid rgba(34,211,238,0.2)" }}>
                     <div className={cn("flex items-center gap-2 mb-3", isRTL && "flex-row-reverse")}>

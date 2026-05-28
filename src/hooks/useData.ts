@@ -40,7 +40,7 @@ export const useProjects = () => {
   useEffect(() => { load(); }, [load]);
 
   const createProject = async (
-    data: Omit<Project, "id" | "userId" | "createdAt" | "updatedAt" | "promptCount">
+    data: Pick<Project, "name" | "description" | "color"> & { icon?: string }
   ): Promise<Project | null> => {
     if (!user) return null;
     const { data: row, error } = await supabase
@@ -56,23 +56,17 @@ export const useProjects = () => {
       .select()
       .single();
 
-    if (error || !row) return null;
+    if (error || !row) { console.error("createProject error:", error); return null; }
     await load();
     return {
-      id: row.id,
-      userId: row.user_id,
-      name: row.name,
-      description: row.description,
-      color: row.color,
-      icon: row.icon,
-      promptCount: row.prompt_count,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      id: row.id, userId: row.user_id, name: row.name,
+      description: row.description, color: row.color, icon: row.icon,
+      promptCount: row.prompt_count, createdAt: row.created_at, updatedAt: row.updated_at,
     };
   };
 
-  const updateProject = async (id: string, data: Partial<Project>) => {
-    await supabase
+  const updateProject = async (id: string, data: Partial<Pick<Project, "name" | "description" | "color" | "icon">>) => {
+    const { error } = await supabase
       .from("projects")
       .update({
         ...(data.name !== undefined && { name: data.name }),
@@ -81,11 +75,13 @@ export const useProjects = () => {
         ...(data.icon !== undefined && { icon: data.icon }),
       })
       .eq("id", id);
+    if (error) console.error("updateProject error:", error);
     await load();
   };
 
   const deleteProject = async (id: string) => {
-    await supabase.from("projects").delete().eq("id", id);
+    const { error } = await supabase.from("projects").delete().eq("id", id);
+    if (error) console.error("deleteProject error:", error);
     await load();
   };
 
@@ -111,7 +107,8 @@ export const usePrompts = (projectId?: string) => {
     if (projectId) query = query.eq("project_id", projectId);
 
     const { data, error } = await query;
-    if (!error && data) {
+    if (error) { console.error("usePrompts load error:", error); setLoading(false); return; }
+    if (data) {
       setPrompts(
         data.map((p) => ({
           id: p.id,
@@ -133,7 +130,7 @@ export const usePrompts = (projectId?: string) => {
   useEffect(() => { load(); }, [load]);
 
   const createPrompt = async (
-    data: Omit<Prompt, "id" | "userId" | "createdAt" | "updatedAt">
+    data: Pick<Prompt, "title" | "content" | "description" | "tags" | "projectId">
   ): Promise<Prompt | null> => {
     if (!user) return null;
     const vars = extractVariables(data.content);
@@ -152,23 +149,15 @@ export const usePrompts = (projectId?: string) => {
       .select()
       .single();
 
-    if (error || !row) return null;
+    if (error || !row) { console.error("createPrompt error:", error); return null; }
 
-    // Update prompt_count
-    await supabase.rpc
-      ? await supabase
-          .from("projects")
-          .update({ prompt_count: supabase.from("prompts") as unknown as number })
-          .eq("id", data.projectId)
-      : null;
-
-    // Simple increment via select + update
+    // Increment prompt_count on the project
     const { data: proj } = await supabase
       .from("projects")
       .select("prompt_count")
       .eq("id", data.projectId)
       .single();
-    if (proj) {
+    if (proj !== null) {
       await supabase
         .from("projects")
         .update({ prompt_count: (proj.prompt_count ?? 0) + 1 })
@@ -177,22 +166,16 @@ export const usePrompts = (projectId?: string) => {
 
     await load();
     return {
-      id: row.id,
-      userId: row.user_id,
-      projectId: row.project_id,
-      title: row.title,
-      content: row.content,
-      description: row.description,
-      tags: row.tags,
-      variables: row.variables,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      id: row.id, userId: row.user_id, projectId: row.project_id,
+      title: row.title, content: row.content, description: row.description,
+      tags: row.tags, variables: row.variables,
+      createdAt: row.created_at, updatedAt: row.updated_at,
     };
   };
 
-  const updatePrompt = async (id: string, data: Partial<Prompt>) => {
-    const vars = data.content ? extractVariables(data.content) : undefined;
-    await supabase
+  const updatePrompt = async (id: string, data: Partial<Pick<Prompt, "title" | "content" | "description" | "tags" | "variables">>) => {
+    const vars = data.content !== undefined ? extractVariables(data.content) : undefined;
+    const { error } = await supabase
       .from("prompts")
       .update({
         ...(data.title !== undefined && { title: data.title }),
@@ -202,20 +185,20 @@ export const usePrompts = (projectId?: string) => {
         ...(vars !== undefined && { variables: vars }),
       })
       .eq("id", id);
+    if (error) console.error("updatePrompt error:", error);
     await load();
   };
 
   const deletePrompt = async (id: string) => {
-    // Get prompt to find project_id
     const { data: toDelete } = await supabase
       .from("prompts")
       .select("project_id")
       .eq("id", id)
       .single();
 
-    await supabase.from("prompts").delete().eq("id", id);
+    const { error } = await supabase.from("prompts").delete().eq("id", id);
+    if (error) { console.error("deletePrompt error:", error); return; }
 
-    // Decrement prompt_count
     if (toDelete?.project_id) {
       const { data: proj } = await supabase
         .from("projects")
@@ -229,7 +212,6 @@ export const usePrompts = (projectId?: string) => {
           .eq("id", toDelete.project_id);
       }
     }
-
     await load();
   };
 
@@ -251,20 +233,21 @@ export const useTestRuns = () => {
       .order("created_at", { ascending: false })
       .limit(50);
 
-    if (!error && data) {
+    if (error) { console.error("useTestRuns load error:", error); return; }
+    if (data) {
       setRuns(
         data.map((r) => ({
           id: r.id,
           promptId: r.prompt_id ?? "direct",
           promptText: r.prompt_text,
           modelA: r.model_a,
-          modelB: r.model_b ?? "",
+          modelB: r.model_b ?? undefined,
           outputA: r.output_a ?? "",
-          outputB: r.output_b ?? "",
+          outputB: r.output_b ?? undefined,
           tokensA: r.tokens_a ?? 0,
-          tokensB: r.tokens_b ?? 0,
+          tokensB: r.tokens_b ?? undefined,
           timeA: r.time_a ?? 0,
-          timeB: r.time_b ?? 0,
+          timeB: r.time_b ?? undefined,
           createdAt: r.created_at,
         }))
       );
@@ -282,31 +265,31 @@ export const useTestRuns = () => {
         prompt_id: run.promptId === "direct" ? null : run.promptId,
         prompt_text: run.promptText,
         model_a: run.modelA,
-        model_b: run.modelB || null,
+        model_b: run.modelB ?? null,
         output_a: run.outputA ?? "",
-        output_b: run.outputB ?? "",
+        output_b: run.outputB ?? null,
         tokens_a: run.tokensA ?? 0,
-        tokens_b: run.tokensB ?? 0,
+        tokens_b: run.tokensB ?? null,
         time_a: run.timeA ?? 0,
-        time_b: run.timeB ?? 0,
+        time_b: run.timeB ?? null,
       })
       .select()
       .single();
 
-    if (error || !row) return null;
+    if (error || !row) { console.error("saveRun error:", error); return null; }
     await load();
     return {
       id: row.id,
       promptId: row.prompt_id ?? "direct",
       promptText: row.prompt_text,
       modelA: row.model_a,
-      modelB: row.model_b ?? "",
+      modelB: row.model_b ?? undefined,
       outputA: row.output_a,
-      outputB: row.output_b,
+      outputB: row.output_b ?? undefined,
       tokensA: row.tokens_a,
-      tokensB: row.tokens_b,
+      tokensB: row.tokens_b ?? undefined,
       timeA: row.time_a,
-      timeB: row.time_b,
+      timeB: row.time_b ?? undefined,
       createdAt: row.created_at,
     };
   };
@@ -322,12 +305,11 @@ export const extractVariables = (content: string): string[] => {
   const vars: string[] = [];
   let match;
   while ((match = regex.exec(content)) !== null) {
-    const varName = match[1].trim();
-    if (!vars.includes(varName)) vars.push(varName);
+    const v = match[1].trim();
+    if (!vars.includes(v)) vars.push(v);
   }
   return vars;
 };
 
-export const interpolatePrompt = (content: string, vars: Record<string, string>): string => {
-  return content.replace(/\{\{([^}]+)\}\}/g, (_, key) => vars[key.trim()] || `{{${key}}}`);
-};
+export const interpolatePrompt = (content: string, vars: Record<string, string>): string =>
+  content.replace(/\{\{([^}]+)\}\}/g, (_, key) => vars[key.trim()] || `{{${key}}}`);
