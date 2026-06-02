@@ -112,7 +112,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       options: {
         data: { full_name: name, name },
         // Redirect to callback page after email confirmation
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
+        // Use the production URL explicitly to avoid localhost in confirmation emails
+        emailRedirectTo: `${window.location.hostname === 'localhost' ? 'https://react-9bhws8.onspace.build' : window.location.origin}/auth/callback`,
       },
     });
 
