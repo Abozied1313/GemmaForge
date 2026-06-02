@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
-import { Eye, EyeOff, Globe, ArrowLeft, ArrowRight } from "lucide-react";
+import { Eye, EyeOff, Globe, ArrowLeft, ArrowRight, Mail } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LanguageContext";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,7 @@ const GemmaLogoMark: React.FC<{ size?: number }> = ({ size = 32 }) => (
 
 const AuthPage: React.FC = () => {
   const { t, lang, setLang, isRTL } = useLang();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -36,6 +36,13 @@ const AuthPage: React.FC = () => {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  /** Shown after successful sign-up when email confirmation is required */
+  const [confirmationSent, setConfirmationSent] = useState(false);
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) navigate("/dashboard", { replace: true });
+  }, [user, navigate]);
 
   useEffect(() => {
     const m = searchParams.get("mode");
@@ -44,31 +51,108 @@ const AuthPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
+    setLoading(true);
 
-    try {
-      let ok = false;
-      if (mode === "signin") {
-        ok = await signIn(email, password);
-        if (!ok) setError(isRTL ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : "Invalid email or password");
-      } else {
-        if (password.length < 6) {
-          setError(isRTL ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل" : "Password must be at least 6 characters");
-          setLoading(false);
-          return;
-        }
-        ok = await signUp(email, password, name);
-        if (!ok) setError(isRTL ? "فشل إنشاء الحساب — قد يكون البريد مسجّلاً مسبقاً" : "Sign up failed — email may already be registered");
+    if (mode === "signin") {
+      const err = await signIn(email, password);
+      if (err) {
+        setError(err);
+        setLoading(false);
+      }
+      // On success: useEffect above will detect user and navigate to /dashboard
+      // Don't call setLoading(false) on success — let navigation happen naturally
+    } else {
+      // Sign up
+      if (password.length < 6) {
+        setError(
+          isRTL
+            ? "كلمة المرور يجب أن تكون 6 أحرف على الأقل"
+            : "Password must be at least 6 characters"
+        );
+        setLoading(false);
+        return;
+      }
+
+      const err = await signUp(email, password, name);
+      if (err) {
+        setError(err);
+        setLoading(false);
+        return;
       }
 
       setLoading(false);
-      if (ok) navigate("/dashboard");
-    } catch {
-      setError(isRTL ? "حدث خطأ غير متوقع. حاول مرة أخرى" : "An unexpected error occurred. Please try again");
-      setLoading(false);
+
+      // If user is now set → email confirmation was disabled, redirect immediately
+      // If user is not set → confirmation email was sent, show confirmation screen
+      // The user state update is handled by onAuthStateChange, give it a tick
+      setTimeout(() => {
+        // Check if AuthContext set the user (email confirm disabled)
+        // If not, show the confirmation sent screen
+        setConfirmationSent(true);
+      }, 300);
     }
   };
+
+  /* ── Confirmation Screen ── */
+  if (confirmationSent) {
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center px-4 py-12"
+        style={{ background: "#080a0f" }}
+        dir={isRTL ? "rtl" : "ltr"}
+      >
+        <div
+          className="w-full max-w-md text-center rounded-2xl p-10"
+          style={{
+            background: "#0e1117",
+            border: "1px solid #1e2535",
+            boxShadow: "0 25px 60px rgba(0,0,0,0.6)",
+          }}
+        >
+          <div
+            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-6"
+            style={{ background: "rgba(34,211,238,0.12)", border: "1px solid rgba(34,211,238,0.3)" }}
+          >
+            <Mail className="w-8 h-8" style={{ color: "#22d3ee" }} />
+          </div>
+          <h2 className="text-xl font-bold text-white mb-3">
+            {isRTL ? "تحقق من بريدك الإلكتروني" : "Check your email"}
+          </h2>
+          <p className="text-sm mb-2" style={{ color: "#8892a4" }}>
+            {isRTL
+              ? `أرسلنا رابط تأكيد إلى:`
+              : `We sent a confirmation link to:`}
+          </p>
+          <p className="font-mono text-sm mb-6 text-white">{email}</p>
+          <p className="text-sm mb-8" style={{ color: "#8892a4" }}>
+            {isRTL
+              ? "انقر على الرابط في البريد لتفعيل حسابك والدخول."
+              : "Click the link in the email to activate your account and sign in."}
+          </p>
+          <button
+            onClick={() => {
+              setConfirmationSent(false);
+              setMode("signin");
+              setPassword("");
+            }}
+            className="w-full py-3 rounded-xl text-sm font-semibold text-white transition-all"
+            style={{
+              background: "linear-gradient(135deg,#6c3aff,#22d3ee)",
+              boxShadow: "0 0 20px rgba(108,58,255,0.35)",
+            }}
+          >
+            {isRTL ? "الانتقال لتسجيل الدخول" : "Go to Sign In"}
+          </button>
+          <p className="text-xs mt-4" style={{ color: "#4a5568" }}>
+            {isRTL
+              ? "لم تستلم البريد؟ تحقق من مجلد البريد المزعج"
+              : "Didn't receive it? Check your spam folder"}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -136,17 +220,11 @@ const AuthPage: React.FC = () => {
         }}
       >
         {/* Card Header */}
-        <div
-          className="px-8 py-8 border-b"
-          style={{ borderColor: "#1e2535" }}
-        >
+        <div className="px-8 py-8 border-b" style={{ borderColor: "#1e2535" }}>
           <div className={cn("flex items-center gap-3 mb-6", isRTL && "flex-row-reverse")}>
             <GemmaLogoMark size={36} />
             <div className={isRTL ? "text-right" : ""}>
-              <p
-                className="text-lg font-bold leading-none text-white"
-                style={{ fontFamily: "Inter, sans-serif" }}
-              >
+              <p className="text-lg font-bold leading-none text-white" style={{ fontFamily: "Inter, sans-serif" }}>
                 Gemma{" "}
                 <span
                   style={{
@@ -292,14 +370,16 @@ const AuthPage: React.FC = () => {
               }}
             >
               {loading
-                ? (mode === "signin" ? t("signingIn") : t("signingUp"))
+                ? (mode === "signin"
+                    ? (isRTL ? "جارٍ تسجيل الدخول..." : "Signing in...")
+                    : (isRTL ? "جارٍ إنشاء الحساب..." : "Creating account..."))
                 : (mode === "signin" ? t("signIn") : t("signUp"))
               }
             </button>
           </form>
 
           {/* Switch Mode */}
-          <p className={cn("mt-5 text-sm text-center", isRTL && "text-right")} style={{ color: "#8892a4" }}>
+          <p className={cn("mt-5 text-sm text-center")} style={{ color: "#8892a4" }}>
             {mode === "signin" ? t("noAccount") : t("hasAccount")}{" "}
             <button
               onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); }}
